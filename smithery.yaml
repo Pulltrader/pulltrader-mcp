@@ -1,0 +1,41 @@
+# Smithery listing metadata for the Pulltrader Seller Economics MCP server.
+#
+# This server is REMOTE and already hosted (bring-your-own-hosting). Smithery's
+# Gateway proxies to the public HTTPS Streamable HTTP endpoint below. There is no
+# build step and no stdio bundle.
+#
+# Publish (requires a Smithery account + explicit approval — do NOT run during dev):
+#   smithery auth login
+#   smithery mcp publish "https://mcp.pulltrader.app/mcp" -n pulltrader/seller-economics
+#
+# Requirements satisfied by this server:
+#   - Streamable HTTP transport at /mcp
+#   - Public HTTPS URL with no trailing slash
+#   - Public (no auth); returns JSON-RPC errors, never a bare 403
+
+runtime: remote
+url: https://mcp.pulltrader.app/mcp
+transport: streamable-http
+authentication: none
+
+metadata:
+  name: Pulltrader Seller Economics
+  description: Compare what a trading-card seller keeps across eBay and Pulltrader selling methods.
+  categories:
+    - finance
+    - ecommerce
+  tags:
+    - trading-cards
+    - seller-tools
+    - fees
+    - ebay
+    - payout
+  homepage: https://pulltrader.app/mcp
+  examplePrompts:
+    - "Compare my estimated proceeds on a $250 graded-card sale."
+    - "What would I keep on a $80 card on eBay vs Pulltrader?"
+    - "If I'm on the Pro plan, what do I net on a $500 sale through Pulltrader?"
+    - "Explain the assumptions behind this payout estimate."
+
+# This server takes no per-user configuration; all tool inputs are passed per call.
+configSchema: {}

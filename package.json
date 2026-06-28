@@ -1,0 +1,28 @@
+{
+  "name": "pulltrader-mcp",
+  "version": "0.2.1",
+  "private": true,
+  "description": "Pulltrader Seller Economics MCP server — compare estimated trading-card seller proceeds across eBay, Pulltrader, and other marketplaces.",
+  "license": "MIT",
+  "homepage": "https://pulltrader.app/mcp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pulltrader/pulltrader-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pulltrader/pulltrader-mcp/issues"
+  },
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250101.0",
+    "typescript": "^5.4.5",
+    "vitest": "^2.1.8",
+    "wrangler": "^3.0.0"
+  }
+}

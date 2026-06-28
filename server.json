@@ -1,0 +1,36 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "app.pulltrader/seller-economics",
+  "title": "Pulltrader Seller Economics",
+  "description": "Compare what a trading-card seller keeps across eBay, Pulltrader, and other card marketplaces.",
+  "version": "0.2.1",
+  "websiteUrl": "https://pulltrader.app/mcp",
+  "repository": {
+    "url": "https://github.com/pulltrader/pulltrader-mcp",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.pulltrader.app/mcp"
+    }
+  ],
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "categories": ["finance", "ecommerce", "productivity"],
+      "tags": ["trading-cards", "seller", "fees", "ebay", "payout", "pulltrader", "tcgplayer", "manapool", "misprint", "fanatics-collect", "goldin"],
+      "tools": ["compare_selling_costs"],
+      "authentication": "none",
+      "readOnly": true,
+      "feeScheduleVersions": {
+        "ebay": "2026-06-27",
+        "pulltrader": "2026-06-01",
+        "tcgplayer": "2026-06-27",
+        "manapool": "2026-06-27",
+        "misprint": "2026-06-27",
+        "fanatics_collect": "2026-06-27",
+        "goldin": "2026-06-27"
+      }
+    }
+  }
+}

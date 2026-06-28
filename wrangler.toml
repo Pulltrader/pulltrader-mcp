@@ -1,0 +1,29 @@
+name = "pulltrader-mcp"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# Public, read-only MCP server. Streamable HTTP transport at /mcp.
+# Served at mcp.pulltrader.app so the MCP Registry namespace
+# `app.pulltrader/seller-economics` can be DNS/HTTP-verified against pulltrader.app.
+#
+# Bound with a specific zone route (not a Custom Domain) so the host can sit
+# alongside other apps on the same zone. Requires a proxied DNS record for
+# mcp.pulltrader.app on the zone.
+routes = [
+  { pattern = "mcp.pulltrader.app/*", zone_name = "pulltrader.app" }
+]
+
+[vars]
+# Public marketing/docs URL surfaced in tool responses (no PII appended).
+PULLTRADER_RELATED_URL = "https://pulltrader.app/sell"
+# Set to "1" to disable the privacy-safe usage analytics beacon entirely.
+DISABLE_ANALYTICS = "0"
+# Best-effort per-IP rate limit for the public endpoint (requests per minute).
+PUBLIC_RATE_LIMIT_PER_MIN = "60"
+
+# Optional: privacy-safe usage analytics (tool name, success/error, latency only).
+# Set POSTHOG_HOST to your analytics endpoint. The project key is NOT a secret in
+# PostHog's model but is injected as a wrangler secret to keep it out of source:
+#   wrangler secret put POSTHOG_API_KEY
+# [vars]
+# POSTHOG_HOST = "https://your-posthog-host.example.com"

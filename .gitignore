@@ -1,0 +1,8 @@
+node_modules/
+.wrangler/
+dist/
+*.log
+.dev.vars
+# MCP Registry DNS-auth keypair — private key, never commit.
+.mcp-auth/
+key.pem
