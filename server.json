@@ -3,7 +3,7 @@
   "name": "app.pulltrader/seller-economics",
   "title": "Pulltrader Seller Economics",
   "description": "Compare what a trading-card seller keeps across eBay, Pulltrader, and other card marketplaces.",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "websiteUrl": "https://pulltrader.app/mcp",
   "repository": {
     "url": "https://github.com/pulltrader/pulltrader-mcp",

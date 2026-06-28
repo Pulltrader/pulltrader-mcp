@@ -1,6 +1,6 @@
 {
   "name": "pulltrader-mcp",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "description": "Pulltrader Seller Economics MCP server — compare estimated trading-card seller proceeds across eBay, Pulltrader, and other marketplaces.",
   "license": "MIT",

@@ -4,6 +4,10 @@ All notable changes to the Pulltrader Seller Economics MCP server are documented
 Versioning follows [Semantic Versioning](https://semver.org/). The MCP server version,
 `server.json` version, and `package.json` version must stay in sync for registry publishing.
 
+## [0.2.2]
+### Changed
+- Added a `repository` link (`github.com/pulltrader/pulltrader-mcp`) to `server.json` and `package.json`, and generalized internal references in source comments and docs ahead of the public repo. No tool behavior or fee values changed.
+
 ## [0.2.1]
 ### Changed
 - Clarified the Goldin schedule's conditional notes: the fixed-price Marketplace requires graded items in the Goldin/Collectors Vault ($100+), the 22% buyer's premium applies to Marketplace purchases (not only auctions), and the auction format (seller keeps ~100% of hammer, negotiated consignment) is separate. Fee values are unchanged.
