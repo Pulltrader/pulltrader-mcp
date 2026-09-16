@@ -1,5 +1,9 @@
 // =============================================================================
-// TOOL: compare_selling_costs
+// TOOL: calculate_required_sale_price
+// =============================================================================
+// Inverse of compare_selling_costs: given a target take-home amount, solve for
+// the per-item sale price a seller must charge on ONE selling method, after fees.
+// Deterministic (bisection over the canonical fee engine). No pricing/market data.
 // =============================================================================
 
 import { toolError, type ToolError } from "../errors";
@@ -14,35 +18,44 @@ import {
 } from "../fees/schedule";
 import {
   computeMethod,
+  requiredSalePriceForNet,
   round2,
   COMPETITOR_METHODS,
-  DEFAULT_METHODS,
   SUPPORTED_METHODS,
+  type ComputeInput,
   type MethodResult,
   type SellingMethod,
 } from "../fees/calculator";
 
-export const TOOL_NAME = "compare_selling_costs";
+export const TOOL_NAME = "calculate_required_sale_price";
 
 export const TOOL_DEFINITION = {
   name: TOOL_NAME,
-  title: "Compare trading-card seller proceeds across selling methods",
+  title: "Find the sale price needed to reach a target net payout",
   description:
-    "Compare estimated fees and the net amount a trading-card seller keeps when selling the SAME card across eBay (estimated), Pulltrader selling methods (marketplace, Fulfilled by Pulltrader, branded storefront, and in-person POS), and other marketplaces (TCGplayer, Mana Pool, Misprint, Fanatics Collect, Goldin — estimated fixed-price/Buy Now seller fees). " +
-    "Use this when a seller asks what they would keep/net/take-home on a sale, how fees compare between platforms, or which method leaves them with more money. " +
+    "Given a target take-home amount, compute the per-item sale price a trading-card seller must list at to net that amount on ONE selling method, after fees — eBay (estimated), a Pulltrader selling method (marketplace, Fulfilled by Pulltrader, branded storefront, in-person POS), or an estimated competitor marketplace (TCGplayer, Mana Pool, Misprint, Fanatics Collect, Goldin). " +
+    "If acquisition_cost is supplied, the target is treated as net profit (payout minus what you paid); otherwise it is the take-home payout. " +
+    "Use this when a seller asks 'what do I need to list this at to walk away with $X', 'to net/profit $X after fees', or 'to break even'. " +
     "Calculations are deterministic and use dated fee schedules. " +
-    "Competitor marketplaces are off by default; include them via the `methods` field. Only fixed-price seller fees are modeled — auction formats (hammer price, buyer's premium, negotiated consignment) are not. " +
     "Do NOT use this to look up a card's market value or recent sales (this tool does not price cards), and do NOT use it for non-trading-card categories. " +
-    "Present competitor and eBay figures as estimates, never as guaranteed proceeds, and never claim one platform is universally cheapest.",
+    "Present eBay and competitor figures as estimates, never as guaranteed proceeds.",
   inputSchema: {
     type: "object",
     additionalProperties: false,
     properties: {
-      sale_price: {
+      target_net: {
         type: "number",
         exclusiveMinimum: 0,
         maximum: 1_000_000,
-        description: "The per-item sale price (the card's listed/sold price), in the given currency.",
+        description:
+          "The amount the seller wants to keep per item after fees. Net profit if acquisition_cost is supplied, otherwise take-home payout.",
+      },
+      method: {
+        type: "string",
+        enum: SUPPORTED_METHODS,
+        default: "ebay",
+        description:
+          "The single selling method to solve for. One of: ebay, pulltrader_marketplace, pulltrader_fbp, pulltrader_storefront, pulltrader_pos, tcgplayer, manapool, misprint, fanatics_collect, goldin.",
       },
       currency: {
         type: "string",
@@ -62,8 +75,7 @@ export const TOOL_DEFINITION = {
         minimum: 0,
         maximum: 100_000,
         default: 0,
-        description:
-          "Shipping amount charged to the buyer. Affects eBay's fee base. See assumptions for how each method treats shipping.",
+        description: "Shipping amount charged to the buyer. Affects eBay's fee base.",
       },
       item_category: {
         type: "string",
@@ -88,70 +100,63 @@ export const TOOL_DEFINITION = {
         type: "boolean",
         default: false,
         description:
-          "If true, the seller absorbs the Pulltrader platform fee (3.25% + $0.40). If false (default), the buyer pays it at checkout. The platform fee is always charged on Pulltrader card sales regardless.",
+          "If true, the seller absorbs the Pulltrader platform fee (3.25% + $0.40). If false (default), the buyer pays it at checkout.",
       },
       ebay_store_subscription: {
         type: "boolean",
         default: false,
         description:
-          "If true, estimate eBay fees using the eBay Store subscriber rate (12.35% up to $2,500/item) instead of the individual rate (13.25% up to $7,500/item).",
-      },
-      methods: {
-        type: "array",
-        items: { type: "string", enum: SUPPORTED_METHODS },
-        uniqueItems: true,
-        description:
-          "Which selling methods to compare. Defaults to eBay, Pulltrader marketplace, and Pulltrader storefront. " +
-          "Other supported methods (off by default): pulltrader_fbp, pulltrader_pos, and estimated competitor marketplaces tcgplayer, manapool, misprint, fanatics_collect, goldin.",
+          "If true, estimate eBay fees using the eBay Store subscriber rate instead of the individual rate.",
       },
       acquisition_cost: {
         type: "number",
         minimum: 0,
         maximum: 1_000_000,
-        description: "Optional. What the seller paid for the card; used to estimate net profit per method.",
+        description:
+          "Optional. What the seller paid for the card. When supplied, target_net is interpreted as net profit (payout minus this cost).",
       },
       ebay_fee_percent_override: {
         type: "number",
         minimum: 0,
         maximum: 100,
-        description:
-          "Optional. Override the estimated eBay final value fee percentage (e.g. for a seller with an eBay Store subscription).",
+        description: "Optional. Override the estimated eBay final value fee percentage.",
       },
     },
-    required: ["sale_price"],
+    required: ["target_net"],
   },
 } as const;
 
-export interface CompareSuccess {
+export interface RequiredSuccess {
   ok: true;
-  result: CompareResult;
+  result: RequiredResult;
 }
-export interface CompareFailure {
+export interface RequiredFailure {
   ok: false;
   error: ToolError;
 }
-export type CompareOutcome = CompareSuccess | CompareFailure;
+export type RequiredOutcome = RequiredSuccess | RequiredFailure;
 
-export interface CompareResult {
+export interface RequiredResult {
   currency: "USD";
-  sale_price: number;
+  method: SellingMethod;
+  target_net: number;
+  net_basis: "net_profit_after_acquisition_cost" | "take_home_payout";
   quantity: number;
   shipping_amount: number;
   item_category: "trading_cards";
   seller_plan: SellerPlan;
   seller_level?: SellerLevel;
-  baseline_method: SellingMethod;
-  methods: MethodResult[];
-  difference_from_baseline: Array<{ method: SellingMethod; amount: number }>;
-  best_for_seller: SellingMethod;
+  required_sale_price: number | null;
+  achieved_net: number | null;
+  reachable: boolean;
+  breakdown: MethodResult | null;
   assumptions: string[];
   inputs_used: Array<{ field: string; value: string | number | boolean; source: "provided" | "default" }>;
   fee_schedules: {
     ebay: { version: string; effective_date: string; source: string; source_url: string; estimated: true };
     pulltrader: { version: string; effective_date: string; source: string; source_url: string; estimated: false };
   };
-  /** Provenance for any competitor marketplaces included in this comparison. */
-  competitor_fee_schedules?: Array<{
+  competitor_fee_schedule?: {
     method: CompetitorMethod;
     name: string;
     version: string;
@@ -159,7 +164,7 @@ export interface CompareResult {
     source: string;
     source_url: string;
     estimated: true;
-  }>;
+  };
   fee_schedule_version: string;
   warnings: string[];
   calculated_at: string;
@@ -172,7 +177,6 @@ type RawArgs = Record<string, unknown>;
 function isPlainObject(v: unknown): v is RawArgs {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
-
 function asFiniteNumber(v: unknown): number | null {
   if (typeof v !== "number" || !Number.isFinite(v)) return null;
   return v;
@@ -183,11 +187,7 @@ export interface ComputeOptions {
   relatedUrl?: string;
 }
 
-/**
- * Validate args and compute the comparison. Pure aside from `now`/`relatedUrl`,
- * which are injected so the function stays deterministic and testable.
- */
-export function compareSellingCosts(args: unknown, options: ComputeOptions = {}): CompareOutcome {
+export function calculateRequiredSalePrice(args: unknown, options: ComputeOptions = {}): RequiredOutcome {
   const now = options.now ?? new Date();
   const relatedUrl = options.relatedUrl ?? "https://pulltrader.app/sell";
 
@@ -195,25 +195,36 @@ export function compareSellingCosts(args: unknown, options: ComputeOptions = {})
     return { ok: false, error: toolError("INVALID_INPUT", "Arguments must be an object.") };
   }
 
-  const inputsUsed: CompareResult["inputs_used"] = [];
+  const inputsUsed: RequiredResult["inputs_used"] = [];
   const track = (field: string, value: string | number | boolean, provided: boolean) =>
     inputsUsed.push({ field, value, source: provided ? "provided" : "default" });
 
-  // --- sale_price (required) ---
-  const salePrice = asFiniteNumber(args.sale_price);
-  if (salePrice === null) {
-    return { ok: false, error: toolError("INVALID_INPUT", "sale_price is required and must be a finite number.", "sale_price") };
+  // --- target_net (required) ---
+  const targetNet = asFiniteNumber(args.target_net);
+  if (targetNet === null) {
+    return { ok: false, error: toolError("INVALID_INPUT", "target_net is required and must be a finite number.", "target_net") };
   }
-  if (salePrice <= 0) {
-    return { ok: false, error: toolError("INVALID_INPUT", "sale_price must be greater than 0.", "sale_price") };
+  if (targetNet <= 0) {
+    return { ok: false, error: toolError("INVALID_INPUT", "target_net must be greater than 0.", "target_net") };
   }
-  if (salePrice > 1_000_000) {
-    return { ok: false, error: toolError("INVALID_INPUT", "sale_price exceeds the supported maximum (1,000,000).", "sale_price") };
+  if (targetNet > 1_000_000) {
+    return { ok: false, error: toolError("INVALID_INPUT", "target_net exceeds the supported maximum (1,000,000).", "target_net") };
   }
-  track("sale_price", salePrice, true);
+  track("target_net", targetNet, true);
+
+  // --- method (single) ---
+  let method: SellingMethod = "ebay";
+  if (args.method !== undefined) {
+    if (typeof args.method !== "string" || !SUPPORTED_METHODS.includes(args.method as SellingMethod)) {
+      return { ok: false, error: toolError("UNSUPPORTED_SELLING_METHOD", `Unsupported selling method '${String(args.method)}'. Supported: ${SUPPORTED_METHODS.join(", ")}.`, "method") };
+    }
+    method = args.method as SellingMethod;
+    track("method", method, true);
+  } else {
+    track("method", method, false);
+  }
 
   // --- currency ---
-  let currency: "USD" = "USD";
   if (args.currency !== undefined) {
     if (typeof args.currency !== "string") {
       return { ok: false, error: toolError("INVALID_INPUT", "currency must be a string.", "currency") };
@@ -221,14 +232,12 @@ export function compareSellingCosts(args: unknown, options: ComputeOptions = {})
     if (args.currency.toUpperCase() !== "USD") {
       return { ok: false, error: toolError("UNSUPPORTED_CURRENCY", `Currency '${args.currency}' is not supported. Only USD is available.`, "currency") };
     }
-    currency = "USD";
-    track("currency", currency, true);
+    track("currency", "USD", true);
   } else {
-    track("currency", currency, false);
+    track("currency", "USD", false);
   }
 
   // --- item_category ---
-  let category: "trading_cards" = "trading_cards";
   if (args.item_category !== undefined) {
     if (typeof args.item_category !== "string") {
       return { ok: false, error: toolError("INVALID_INPUT", "item_category must be a string.", "item_category") };
@@ -236,9 +245,9 @@ export function compareSellingCosts(args: unknown, options: ComputeOptions = {})
     if (args.item_category !== "trading_cards") {
       return { ok: false, error: toolError("UNSUPPORTED_CATEGORY", `Category '${args.item_category}' is not supported. Only trading_cards is available.`, "item_category") };
     }
-    track("item_category", category, true);
+    track("item_category", "trading_cards", true);
   } else {
-    track("item_category", category, false);
+    track("item_category", "trading_cards", false);
   }
 
   // --- quantity ---
@@ -327,29 +336,6 @@ export function compareSellingCosts(args: unknown, options: ComputeOptions = {})
     track("ebay_store_subscription", ebayStoreSubscription, false);
   }
 
-  // --- methods ---
-  let methods: SellingMethod[] = DEFAULT_METHODS;
-  if (args.methods !== undefined) {
-    if (!Array.isArray(args.methods) || args.methods.length === 0) {
-      return { ok: false, error: toolError("INVALID_INPUT", "methods must be a non-empty array.", "methods") };
-    }
-    const seen = new Set<string>();
-    const parsed: SellingMethod[] = [];
-    for (const m of args.methods) {
-      if (typeof m !== "string" || !SUPPORTED_METHODS.includes(m as SellingMethod)) {
-        return { ok: false, error: toolError("UNSUPPORTED_SELLING_METHOD", `Unsupported selling method '${String(m)}'. Supported: ${SUPPORTED_METHODS.join(", ")}.`, "methods") };
-      }
-      if (!seen.has(m)) {
-        seen.add(m);
-        parsed.push(m as SellingMethod);
-      }
-    }
-    methods = parsed;
-    track("methods", methods.join(","), true);
-  } else {
-    track("methods", methods.join(","), false);
-  }
-
   // --- acquisition_cost (optional) ---
   let acquisitionCost: number | undefined;
   if (args.acquisition_cost !== undefined) {
@@ -372,33 +358,24 @@ export function compareSellingCosts(args: unknown, options: ComputeOptions = {})
     track("ebay_fee_percent_override", ebayOverride, true);
   }
 
-  // --- freshness check ---
+  // --- freshness ---
   const warnings: string[] = [];
-  if (methods.includes("ebay") && isScheduleStale(EBAY_FEES.review_by, now)) {
-    warnings.push(
-      `The estimated eBay fee schedule (version ${EBAY_FEES.version}) is past its review date of ${EBAY_FEES.review_by} and may be out of date.`,
-    );
+  if (method === "ebay" && isScheduleStale(EBAY_FEES.review_by, now)) {
+    warnings.push(`The estimated eBay fee schedule (version ${EBAY_FEES.version}) is past its review date of ${EBAY_FEES.review_by} and may be out of date.`);
   }
   if (isScheduleStale(PULLTRADER_FEES.review_by, now)) {
-    warnings.push(
-      `The Pulltrader fee schedule (version ${PULLTRADER_FEES.version}) is past its review date of ${PULLTRADER_FEES.review_by} and may be out of date.`,
-    );
+    warnings.push(`The Pulltrader fee schedule (version ${PULLTRADER_FEES.version}) is past its review date of ${PULLTRADER_FEES.review_by} and may be out of date.`);
   }
-  const competitorMethodsUsed = methods.filter((m): m is CompetitorMethod =>
-    (COMPETITOR_METHODS as string[]).includes(m),
-  );
-  for (const cm of competitorMethodsUsed) {
-    const sched = COMPETITOR_FEES[cm];
+  const isCompetitor = (COMPETITOR_METHODS as string[]).includes(method);
+  if (isCompetitor) {
+    const sched = COMPETITOR_FEES[method as CompetitorMethod];
     if (isScheduleStale(sched.review_by, now)) {
-      warnings.push(
-        `The estimated ${sched.where_it_sells} fee schedule (version ${sched.version}) is past its review date of ${sched.review_by} and may be out of date.`,
-      );
+      warnings.push(`The estimated ${sched.where_it_sells} fee schedule (version ${sched.version}) is past its review date of ${sched.review_by} and may be out of date.`);
     }
   }
 
-  // --- compute ---
-  const computeInput = {
-    sale_price: salePrice,
+  // --- solve ---
+  const base: Omit<ComputeInput, "sale_price"> = {
     quantity,
     shipping_amount: shipping,
     seller_plan: sellerPlan,
@@ -408,52 +385,52 @@ export function compareSellingCosts(args: unknown, options: ComputeOptions = {})
     acquisition_cost: acquisitionCost,
     ebay_fee_percent_override: ebayOverride,
   };
-  const methodResults = methods.map((m) => computeMethod(m, computeInput));
+  const solved = requiredSalePriceForNet(method, targetNet, base);
+  const breakdown =
+    solved.required_sale_price !== null
+      ? computeMethod(method, { ...base, sale_price: solved.required_sale_price })
+      : null;
 
-  // Baseline = eBay when present (the external comparison), else the first method.
-  const baseline = methods.includes("ebay") ? "ebay" : methods[0]!;
-  const baselineResult = methodResults.find((r) => r.method === baseline)!;
-  const diffs = methodResults.map((r) => ({
-    method: r.method,
-    amount: round2(r.estimated_payout - baselineResult.estimated_payout),
-  }));
-  const bestForSeller = methodResults.reduce((best, r) => (r.estimated_payout > best.estimated_payout ? r : best), methodResults[0]!).method;
+  const netBasis: RequiredResult["net_basis"] =
+    acquisitionCost !== undefined ? "net_profit_after_acquisition_cost" : "take_home_payout";
 
   const assumptions: string[] = [
     "All figures are estimates for trading cards in USD.",
-    ebayOverride !== undefined
-      ? "eBay fees use the user-supplied final value fee percentage (flat rate)."
-      : ebayStoreSubscription
-        ? "eBay fees use the eBay Store subscriber rate (12.35% up to $2,500 per item, then 2.35%)."
-        : "eBay fees use the individual rate (13.25% up to $7,500 per item, then 2.35%). Set ebay_store_subscription for Store rates.",
-    "eBay per-order fee is $0.30 for orders \u2264 $10 and $0.40 otherwise; eBay figures exclude promoted listings, international fees, sales tax, and the seller's own shipping-label cost.",
-    "Pulltrader's platform fee (3.25% + $0.40) is always charged on card sales. " +
-      (sellerCoversFees
-        ? "The seller is treated as covering it, so it is deducted from the payout."
-        : "By default the buyer pays it at checkout, so it is not deducted from the seller."),
-    "Pulltrader's seller fee (commission) applies only to marketplace and Fulfilled by Pulltrader sales. Storefront and POS sales have no seller fee — the seller keeps the full item price (cash POS has no fees at all).",
-    "On marketplace and FBP, payout is a percentage of the item subtotal; shipping is handled by Pulltrader and does not change the item payout. Binz fixed pricing applies automatically for qualifying low prices.",
-    "There are no per-item listing fees on Pulltrader.",
+    netBasis === "net_profit_after_acquisition_cost"
+      ? "target_net is treated as net profit: the required price is solved so payout minus acquisition_cost equals the target."
+      : "target_net is treated as take-home payout (no acquisition cost supplied).",
+    "The required price is found by deterministic search over the same fee engine compare_selling_costs uses; Binz fixed pricing and per-order fees are honored.",
     "Payout figures exclude income taxes and any seller-specific promotions or credits.",
   ];
-  if (competitorMethodsUsed.length > 0) {
+  if (method === "ebay") {
     assumptions.push(
-      "Competitor marketplaces (TCGplayer, Mana Pool, Misprint, Fanatics Collect, Goldin) use estimated fixed-price / Buy Now seller fees from each platform's published schedule, with representative rates. Auction formats (hammer price, buyer's premium, negotiated consignment) are not modeled. Each competitor estimate excludes the seller's own shipping-label cost.",
+      ebayOverride !== undefined
+        ? "eBay fees use the user-supplied final value fee percentage (flat rate)."
+        : ebayStoreSubscription
+          ? "eBay fees use the eBay Store subscriber rate."
+          : "eBay fees use the individual rate. Set ebay_store_subscription for Store rates.",
+    );
+  }
+  if (isCompetitor) {
+    assumptions.push(
+      "Competitor estimate uses published fixed-price / Buy Now seller fees; auction formats are not modeled and the seller's own shipping-label cost is excluded.",
     );
   }
 
-  const result: CompareResult = {
-    currency,
-    sale_price: salePrice,
+  const result: RequiredResult = {
+    currency: "USD",
+    method,
+    target_net: targetNet,
+    net_basis: netBasis,
     quantity,
     shipping_amount: shipping,
-    item_category: category,
+    item_category: "trading_cards",
     seller_plan: sellerPlan,
     seller_level: sellerLevel,
-    baseline_method: baseline,
-    methods: methodResults,
-    difference_from_baseline: diffs,
-    best_for_seller: bestForSeller,
+    required_sale_price: solved.required_sale_price,
+    achieved_net: solved.achieved_net,
+    reachable: solved.required_sale_price !== null,
+    breakdown,
     assumptions,
     inputs_used: inputsUsed,
     fee_schedules: {
@@ -472,63 +449,53 @@ export function compareSellingCosts(args: unknown, options: ComputeOptions = {})
         estimated: false,
       },
     },
-    competitor_fee_schedules:
-      competitorMethodsUsed.length > 0
-        ? competitorMethodsUsed.map((cm) => {
-            const s = COMPETITOR_FEES[cm];
-            return {
-              method: cm,
-              name: s.where_it_sells,
-              version: s.version,
-              effective_date: s.effective_date,
-              source: s.source,
-              source_url: s.source_url,
-              estimated: true as const,
-            };
-          })
-        : undefined,
+    competitor_fee_schedule: isCompetitor
+      ? (() => {
+          const s = COMPETITOR_FEES[method as CompetitorMethod];
+          return {
+            method: method as CompetitorMethod,
+            name: s.where_it_sells,
+            version: s.version,
+            effective_date: s.effective_date,
+            source: s.source,
+            source_url: s.source_url,
+            estimated: true as const,
+          };
+        })()
+      : undefined,
     fee_schedule_version: `ebay:${EBAY_FEES.version}+pulltrader:${PULLTRADER_FEES.version}`,
     warnings,
     calculated_at: now.toISOString(),
     disclaimer:
-      "Estimates only, for trading cards in USD. eBay fees are estimated from published rates and exclude several conditional costs. Actual proceeds vary. This is not financial advice.",
+      "Estimates only, for trading cards in USD. eBay and competitor fees are estimated from published rates and exclude several conditional costs. Actual proceeds vary. This is not financial advice.",
     related_url: relatedUrl,
   };
 
   return { ok: true, result };
 }
 
-/** Concise, neutral human-readable summary. Never claims universal superiority. */
-export function summarizeComparison(r: CompareResult): string {
+/** Concise, neutral human-readable summary. */
+export function summarizeRequiredSalePrice(r: RequiredResult): string {
   const money = (n: number) => `$${n.toFixed(2)}`;
-  const labelFor = (m: SellingMethod) => r.methods.find((x) => x.method === m)?.label ?? m;
+  const label = r.breakdown?.label ?? r.method;
+  const qtyNote = r.quantity > 1 ? ` (x${r.quantity})` : "";
+  const basis = r.net_basis === "net_profit_after_acquisition_cost" ? "net profit" : "take-home";
+
+  if (!r.reachable || r.required_sale_price === null) {
+    return [
+      `Even at the maximum supported price, ${label} can't reach a ${basis} of ${money(r.target_net)}${qtyNote} for these inputs — its payout tops out below that.`,
+      r.disclaimer,
+    ].join("\n");
+  }
 
   const lines: string[] = [];
-  const qtyNote = r.quantity > 1 ? ` (x${r.quantity})` : "";
   lines.push(
-    `On a ${money(r.sale_price)}${qtyNote} trading-card sale, estimated seller proceeds by method:`,
+    `To ${basis === "net profit" ? "net a profit of" : "take home"} ${money(r.target_net)}${qtyNote} on ${label}, list at about ${money(r.required_sale_price)} per item.`,
   );
-  for (const m of r.methods) {
-    const est = m.estimated ? " (estimated)" : "";
-    const profit = m.estimated_net_profit !== undefined ? `, est. profit ${money(m.estimated_net_profit)}` : "";
-    lines.push(
-      `- ${m.label}: keep ${money(m.estimated_payout)}${est} (fees ${money(m.estimated_total_fees)}, ${m.effective_fee_rate}%)${profit}`,
-    );
+  if (r.achieved_net !== null) {
+    lines.push(`At that price the estimated ${basis} is ${money(r.achieved_net)} (fees ${money(r.breakdown!.estimated_total_fees)}, ${r.breakdown!.effective_fee_rate}%).`);
   }
-
-  const best = r.methods.find((m) => m.method === r.best_for_seller)!;
-  const baseline = r.methods.find((m) => m.method === r.baseline_method)!;
-  if (best.method !== baseline.method) {
-    const diff = round2(best.estimated_payout - baseline.estimated_payout);
-    if (diff > 0) {
-      lines.push(
-        `For these inputs, ${best.label} returns about ${money(diff)} more than ${baseline.label}.`,
-      );
-    }
-  }
-  lines.push(
-    `Estimate based on fee schedules updated ${r.fee_schedules.pulltrader.effective_date} (Pulltrader) and ${r.fee_schedules.ebay.effective_date} (eBay, estimated). ${r.disclaimer}`,
-  );
+  lines.push(r.disclaimer);
   if (r.warnings.length > 0) lines.push(`Note: ${r.warnings.join(" ")}`);
   return lines.join("\n");
 }

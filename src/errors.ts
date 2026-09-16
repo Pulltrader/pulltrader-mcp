@@ -8,6 +8,12 @@ export type ErrorCode =
   | "FEE_SCHEDULE_UNAVAILABLE"
   | "FEE_SCHEDULE_STALE"
   | "RATE_LIMITED"
+  // Data-backed tools (Scout backend bridge):
+  | "DATA_BACKEND_UNAVAILABLE"
+  | "UPSTREAM_ERROR"
+  | "UPSTREAM_TIMEOUT"
+  | "NOT_FOUND"
+  | "NO_DATA"
   | "INTERNAL_ERROR";
 
 export interface ToolError {

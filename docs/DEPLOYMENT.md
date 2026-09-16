@@ -13,10 +13,19 @@ Use a Wrangler environment for staging vs production, e.g.:
 - Production: `mcp.pulltrader.app`.
 
 ## Secrets / vars
-- Non-secret vars are in `wrangler.toml` (`PULLTRADER_RELATED_URL`, `DISABLE_ANALYTICS`, `PUBLIC_RATE_LIMIT_PER_MIN`).
-- If enabling analytics: `wrangler secret put POSTHOG_API_KEY` and set `POSTHOG_HOST` (your analytics host). No other secrets are required — the server holds no credentials.
+- Non-secret vars are in `wrangler.toml` (`PULLTRADER_RELATED_URL`, `DISABLE_ANALYTICS`, `PUBLIC_RATE_LIMIT_PER_MIN`, `DATA_RATE_LIMIT_PER_MIN`, `DATA_RATE_LIMIT_PER_DAY`, `DATA_GLOBAL_LIMIT_PER_DAY`, `PULLTRADER_API_BASE`).
+- **KV (required for data tools):** create and bind `MCP_ABUSE` before deploy — data-tool budgets fail closed without it:
+  ```bash
+  wrangler kv namespace create MCP_ABUSE
+  wrangler kv namespace create MCP_ABUSE --preview
+  # Paste ids into wrangler.toml [[kv_namespaces]] binding = "MCP_ABUSE"
+  ```
+- Backend bridge: `wrangler secret put SCOUT_MCP_SECRET` (must match the backend env).
+- If enabling analytics: `wrangler secret put POSTHOG_API_KEY` and set `POSTHOG_HOST` (your analytics host).
 
 ## Pre-deploy checklist
+- [ ] `MCP_ABUSE` KV ids pasted into `wrangler.toml` (not placeholders)
+- [ ] `SCOUT_MCP_SECRET` set on the Worker and backend
 - [ ] `npm run typecheck` clean
 - [ ] `npm test` green
 - [ ] `npx wrangler deploy --dry-run` bundles

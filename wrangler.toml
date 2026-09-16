@@ -13,13 +13,34 @@ routes = [
   { pattern = "mcp.pulltrader.app/*", zone_name = "pulltrader.app" }
 ]
 
+# Global abuse / token-bill budgets (see src/abuseGuard.ts).
+# Data-tool budgets fail closed when this binding is missing at runtime.
+[[kv_namespaces]]
+binding = "MCP_ABUSE"
+# Production account (thepulltrader.com) — created via Cloudflare bindings MCP
+id = "<MCP_ABUSE_KV_ID>"
+preview_id = "<MCP_ABUSE_PREVIEW_KV_ID>"
+
 [vars]
 # Public marketing/docs URL surfaced in tool responses (no PII appended).
 PULLTRADER_RELATED_URL = "https://pulltrader.app/sell"
 # Set to "1" to disable the privacy-safe usage analytics beacon entirely.
 DISABLE_ANALYTICS = "0"
-# Best-effort per-IP rate limit for the public endpoint (requests per minute).
+# Coarse per-IP rate limit for all POST /mcp (requests per minute). Fail-open if KV down.
 PUBLIC_RATE_LIMIT_PER_MIN = "60"
+# Data-tool budgets (identify_card / search_card_sales / summarize_card_market /
+# get_card_price_history). Fail-closed if KV unavailable — protects Anthropic spend.
+DATA_RATE_LIMIT_PER_MIN = "8"
+DATA_RATE_LIMIT_PER_DAY = "40"
+DATA_GLOBAL_LIMIT_PER_DAY = "10000"
+# Pulltrader backend base URL for the data-backed card/athlete tools. The bridge
+# is only enabled when BOTH this var and the SCOUT_MCP_SECRET secret are set;
+# otherwise those tools return DATA_BACKEND_UNAVAILABLE.
+PULLTRADER_API_BASE = "https://api.pulltrader.app"
+
+# Shared secret for the backend /api/mcp/* bridge (must match the backend's
+# SCOUT_MCP_SECRET). Injected as a wrangler secret to keep it out of source:
+#   wrangler secret put SCOUT_MCP_SECRET
 
 # Optional: privacy-safe usage analytics (tool name, success/error, latency only).
 # Set POSTHOG_HOST to your analytics endpoint. The project key is NOT a secret in

@@ -1,4 +1,5 @@
-# Smithery listing metadata for the Pulltrader Seller Economics MCP server.
+# Smithery listing metadata for Scout by Pulltrader (trading-card intelligence +
+# seller economics).
 #
 # This server is REMOTE and already hosted (bring-your-own-hosting). Smithery's
 # Gateway proxies to the public HTTPS Streamable HTTP endpoint below. There is no
@@ -19,23 +20,28 @@ transport: streamable-http
 authentication: none
 
 metadata:
-  name: Pulltrader Seller Economics
-  description: Compare what a trading-card seller keeps across eBay and Pulltrader selling methods.
+  name: Scout by Pulltrader
+  description: Identify trading cards, look up recent comparable sold sales, summarize market value, chart price history, and compare what a seller keeps across eBay, Pulltrader, and other card marketplaces.
   categories:
     - finance
     - ecommerce
   tags:
     - trading-cards
+    - comps
+    - market-value
+    - price-history
+    - card-identification
     - seller-tools
     - fees
     - ebay
     - payout
   homepage: https://pulltrader.app/mcp
   examplePrompts:
+    - "What is this card: 2023 Bowman Chrome Elly De La Cruz PSA 10?"
+    - "Show me recent sold comps and market value for that card."
     - "Compare my estimated proceeds on a $250 graded-card sale."
     - "What would I keep on a $80 card on eBay vs Pulltrader?"
     - "If I'm on the Pro plan, what do I net on a $500 sale through Pulltrader?"
-    - "Explain the assumptions behind this payout estimate."
 
 # This server takes no per-user configuration; all tool inputs are passed per call.
 configSchema: {}

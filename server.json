@@ -1,9 +1,9 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "app.pulltrader/seller-economics",
-  "title": "Pulltrader Seller Economics",
-  "description": "Compare what a trading-card seller keeps across eBay, Pulltrader, and other card marketplaces.",
-  "version": "0.2.2",
+  "title": "Scout by Pulltrader",
+  "description": "Trading-card intelligence from Scout by Pulltrader: identify a card from a description, look up recent comparable sold sales, summarize market value (median/percentiles/volatility), and chart price history — plus seller economics to compare what you keep across eBay, Pulltrader, and other card marketplaces, solve for a target net, and explain how each method charges fees. Card data is limited-public and estimate-only; not financial advice.",
+  "version": "0.5.0",
   "websiteUrl": "https://pulltrader.app/mcp",
   "repository": {
     "url": "https://github.com/pulltrader/pulltrader-mcp",
@@ -18,8 +18,8 @@
   "_meta": {
     "io.modelcontextprotocol.registry/publisher-provided": {
       "categories": ["finance", "ecommerce", "productivity"],
-      "tags": ["trading-cards", "seller", "fees", "ebay", "payout", "pulltrader", "tcgplayer", "manapool", "misprint", "fanatics-collect", "goldin"],
-      "tools": ["compare_selling_costs"],
+      "tags": ["trading-cards", "comps", "market-value", "price-history", "card-identification", "seller", "fees", "ebay", "payout", "pulltrader", "tcgplayer", "manapool", "misprint", "fanatics-collect", "goldin"],
+      "tools": ["identify_card", "search_card_sales", "summarize_card_market", "get_card_price_history", "compare_selling_costs", "calculate_required_sale_price", "explain_selling_method"],
       "authentication": "none",
       "readOnly": true,
       "feeScheduleVersions": {

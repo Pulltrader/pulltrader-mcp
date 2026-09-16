@@ -6,12 +6,8 @@
 // =============================================================================
 
 import { DEFAULT_PROTOCOL_VERSION, REGISTRY_NAME, SERVER_NAME, SERVER_VERSION } from "./version";
-import {
-  TOOL_DEFINITION,
-  TOOL_NAME,
-  compareSellingCosts,
-  summarizeComparison,
-} from "./tools/compareSellingCosts";
+import { TOOL_DEFINITIONS, getTool } from "./tools/registry";
+import type { BackendConfig } from "./backend/client";
 
 export interface JsonRpcRequest {
   jsonrpc: "2.0";
@@ -30,6 +26,8 @@ export interface JsonRpcResponse {
 export interface McpContext {
   now?: Date;
   relatedUrl?: string;
+  /** Backend bridge config for data-backed tools. Absent on pure-only servers. */
+  backend?: BackendConfig;
 }
 
 export interface McpOutcome {
@@ -62,7 +60,7 @@ function isRequest(msg: unknown): msg is JsonRpcRequest {
 }
 
 /** Handle one parsed JSON-RPC message. */
-export function handleMcpMessage(msg: unknown, ctx: McpContext = {}): McpOutcome {
+export async function handleMcpMessage(msg: unknown, ctx: McpContext = {}): Promise<McpOutcome> {
   if (!isRequest(msg)) {
     return { response: err(null, JSONRPC_INVALID_REQUEST, "Invalid JSON-RPC 2.0 request.") };
   }
@@ -79,9 +77,9 @@ export function handleMcpMessage(msg: unknown, ctx: McpContext = {}): McpOutcome
         response: ok(id, {
           protocolVersion,
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: SERVER_NAME, title: "Pulltrader Seller Economics", version: SERVER_VERSION },
+          serverInfo: { name: SERVER_NAME, title: "Scout by Pulltrader", version: SERVER_VERSION },
           instructions:
-            "Use compare_selling_costs to estimate what a trading-card seller keeps across eBay and Pulltrader selling methods. Always present eBay figures as estimates and preserve the stated assumptions.",
+            "Scout's trading-card intelligence tools. Card research: identify_card resolves a text description into structured fields; search_card_sales returns recent comparable sold sales; summarize_card_market gives median/percentile/volatility market value; get_card_price_history returns a price-over-time series. Seller economics: compare_selling_costs estimates what a seller keeps across eBay and Pulltrader methods; calculate_required_sale_price solves for the price to hit a target net; explain_selling_method describes how each method charges fees. All market figures are estimates from recent sales (excluding fees/taxes/shipping) and are not financial advice; never claim guaranteed value or one platform as universally cheapest. Trading cards only.",
         }),
       };
     }
@@ -95,18 +93,23 @@ export function handleMcpMessage(msg: unknown, ctx: McpContext = {}): McpOutcome
       return { response: ok(id, {}) };
 
     case "tools/list":
-      return { response: ok(id, { tools: [TOOL_DEFINITION] }) };
+      return { response: ok(id, { tools: TOOL_DEFINITIONS }) };
 
     case "tools/call": {
       const params = (msg.params ?? {}) as { name?: unknown; arguments?: unknown };
       if (typeof params.name !== "string") {
         return { response: err(id, JSONRPC_INVALID_PARAMS, "tools/call requires a string 'name'.") };
       }
-      if (params.name !== TOOL_NAME) {
+      const tool = getTool(params.name);
+      if (!tool) {
         return { response: err(id, JSONRPC_METHOD_NOT_FOUND, `Unknown tool: ${params.name}`) };
       }
       try {
-        const outcome = compareSellingCosts(params.arguments, { now: ctx.now, relatedUrl: ctx.relatedUrl });
+        const outcome = await tool.run(params.arguments, {
+          now: ctx.now,
+          relatedUrl: ctx.relatedUrl,
+          backend: ctx.backend,
+        });
         if (!outcome.ok) {
           // Tool-level (input) error -> isError result, not a JSON-RPC error.
           return {
@@ -115,24 +118,24 @@ export function handleMcpMessage(msg: unknown, ctx: McpContext = {}): McpOutcome
               content: [{ type: "text", text: `Error [${outcome.error.code}]: ${outcome.error.message}` }],
               structuredContent: { error: outcome.error },
             }),
-            toolCall: { name: TOOL_NAME, ok: false, errorCode: outcome.error.code },
+            toolCall: { name: tool.name, ok: false, errorCode: outcome.error.code },
           };
         }
         return {
           response: ok(id, {
-            content: [{ type: "text", text: summarizeComparison(outcome.result) }],
-            structuredContent: outcome.result,
+            content: [{ type: "text", text: outcome.text }],
+            structuredContent: outcome.structured,
           }),
-          toolCall: { name: TOOL_NAME, ok: true },
+          toolCall: { name: tool.name, ok: true },
         };
       } catch {
         return {
           response: ok(id, {
             isError: true,
-            content: [{ type: "text", text: "Error [INTERNAL_ERROR]: failed to compute the comparison." }],
-            structuredContent: { error: { code: "INTERNAL_ERROR", message: "Failed to compute the comparison." } },
+            content: [{ type: "text", text: "Error [INTERNAL_ERROR]: the tool failed to compute a result." }],
+            structuredContent: { error: { code: "INTERNAL_ERROR", message: "The tool failed to compute a result." } },
           }),
-          toolCall: { name: TOOL_NAME, ok: false, errorCode: "INTERNAL_ERROR" },
+          toolCall: { name: tool.name, ok: false, errorCode: "INTERNAL_ERROR" },
         };
       }
     }

@@ -106,7 +106,7 @@ describe("computeMethod: Pulltrader marketplace", () => {
     expect(r.estimated_total_fees).toBe(9);
   });
   it("shop plan keeps 95%", () => {
-    const r = computeMethod("pulltrader_marketplace", { ...base, seller_plan: "shop" });
+    const r = computeMethod("pulltrader_marketplace", { ...base, seller_plan: "business" });
     expect(r.estimated_payout).toBe(95);
   });
   it("deducts platform fee when the seller covers it", () => {

@@ -1,62 +1,83 @@
-# Pulltrader Seller Economics MCP
+# Scout by Pulltrader — Trading-Card MCP Server
 
-> Compare what a trading-card seller keeps across eBay and Pulltrader selling methods — inside your AI assistant.
+> Identify a card, pull recent sold comps, summarize its market value, chart its price history, and compare what a seller keeps across eBay, Pulltrader, and other card marketplaces — inside your AI assistant.
 
-A public, read-only [Model Context Protocol](https://modelcontextprotocol.io) server that estimates the **net amount a trading-card seller keeps** when selling the same card through eBay versus Pulltrader's selling methods (marketplace, Fulfilled by Pulltrader, branded storefront, and in-person POS).
+A public, read-only [Model Context Protocol](https://modelcontextprotocol.io) server for **trading-card research and selling**. Seven tools: four back onto Scout's card data (identification, comparable sold sales, market value, price history), three run Pulltrader's deterministic seller-economics engine over a dated, versioned fee schedule.
 
-Calculations are **deterministic** and use a **dated, versioned fee schedule**. The server performs the math itself — it never asks the model to infer fees from prose. eBay figures are clearly labeled **estimates**.
+Market figures are **estimates** derived from recent sales. Fee math is **deterministic** — the server computes it and never asks the model to infer fees from prose. eBay figures are clearly labeled estimates.
 
 - **Transport:** Streamable HTTP (`POST /mcp`)
 - **Auth:** none (public, read-only)
 - **Endpoint:** `https://mcp.pulltrader.app/mcp`
 - **Registry name:** `app.pulltrader/seller-economics`
+- **Protocol:** `2025-06-18` (the client's requested version is echoed when present)
 
 ## Who it's for
 
-Trading-card sellers, dealers, and shops deciding where to list a card and how much they'll take home — especially while comparing eBay against alternatives.
+Trading-card sellers, dealers, shops, and collectors who want to know what a card is, what it's worth, and what they'd actually take home selling it — without leaving their assistant.
 
 ## What it does (and doesn't)
 
 | Does | Doesn't |
 |---|---|
-| Estimate seller fees & net proceeds per method | Look up a card's market value or recent sales |
-| Compare eBay (estimated) vs Pulltrader methods | Identify a card from text or image |
-| Compute the price needed for a target net (via inputs) | Make any write/account changes |
-| State its assumptions and limitations explicitly | Claim one platform is universally cheapest |
-
-> Card identification, comparable sales, and "what's it worth" are **out of scope** for this server (see [ROADMAP](#roadmap)).
+| Resolve a prose card description into structured fields | Identify a card from an **image** (text only) |
+| Return recent comparable **sold** sales (price + date) | Return listing, affiliate, or per-sale outbound URLs |
+| Summarize market value: median, mean, p10–p90, volatility, confidence | Claim a guaranteed value or give financial advice |
+| Chart price history by day / week / month with a trend | Make any write, order, or account change |
+| Estimate seller fees and net proceeds per selling method | Claim one platform is universally cheapest |
+| Solve for the price needed to hit a target net | Model auction formats (hammer, buyer's premium, consignment) |
+| State its assumptions, data freshness, and limitations | Cover non-card categories or currencies other than USD |
 
 ## Tools
 
-### `compare_selling_costs`
+### Card research (data-backed)
 
-Compare estimated fees and seller net proceeds for one trading-card sale across selling methods.
+These bridge to the Pulltrader backend. Card data is **limited-public**: a capped sample of sales, no per-listing or affiliate URLs, and only the catalog reference image.
 
-**Inputs**
+Each accepts either `query` (a natural-language description, e.g. `"2023 Panini Prizm Victor Wembanyama #136 Silver PSA 10"`) or `item` (structured fields: `player_athlete`, `year_manufactured`, `set_name`, `card_number`, `parallel_variety`, `grader`, `grade`, `sport`). One of the two is required.
 
-| Field | Type | Required | Default | Notes |
-|---|---|---|---|---|
-| `sale_price` | number | ✅ | — | Per-item price, > 0 |
-| `currency` | enum `USD` | | `USD` | Only USD supported |
-| `quantity` | integer | | `1` | Per-order fixed fees applied once |
-| `shipping_amount` | number | | `0` | Affects eBay's fee base |
-| `item_category` | enum `trading_cards` | | `trading_cards` | Only trading cards |
-| `seller_plan` | enum `free`\|`starter`\|`pro`\|`shop` | | `free` | Marketplace payout tier |
-| `seller_covers_fees` | boolean | | `false` | If false, buyer pays the platform fee |
-| `ebay_store_subscription` | boolean | | `false` | Use eBay Store rate (12.35%) vs individual (13.25%) |
-| `methods` | array | | eBay + marketplace + storefront | Subset of supported methods |
-| `acquisition_cost` | number | | — | Estimates net profit per method |
-| `ebay_fee_percent_override` | number | | — | Override estimated eBay FVF % (flat) |
+| Tool | What it returns |
+|---|---|
+| `identify_card` | Canonical fields (player/athlete, year, set, number, parallel, grader, grade, category) plus a confidence level and which fields resolved. Takes `query` only. Does not price the card. |
+| `search_card_sales` | A capped sample of recent comparable sold sales (price + date) plus a market snapshot. Optional `limit`. |
+| `summarize_card_market` | Canonical market value: median, mean, p10–p90, volatility, sample size, confidence. |
+| `get_card_price_history` | A chart-ready time series with a trend. Optional `interval`: `day` \| `week` \| `month`. |
 
-**Supported methods:** `ebay`, `pulltrader_marketplace`, `pulltrader_fbp`, `pulltrader_storefront`, `pulltrader_pos`, and estimated competitor marketplaces `tcgplayer`, `manapool`, `misprint`, `fanatics_collect`, `goldin` (off by default — opt in via `methods`). Competitor figures model **fixed-price / Buy Now seller fees only**; auction formats (hammer price, buyer's premium, negotiated consignment) are not modeled.
+When eBay has no dated comps, `search_card_sales` and `summarize_card_market` fall back to the authoritative vendor price and surface `market_value`, `value_source` (`TCG Market` \| `CardSightAI` \| `eBay Comps`), `price_change_7d`, `price_change_30d`, and a single catalog `image`.
 
-**Output (structured):** `currency`, `sale_price`, `methods[]` (each with `gross_amount`, `estimated_total_fees`, `fee_breakdown`, `estimated_payout`, `effective_fee_rate`, `owns_listing`, `fulfilled_by`, `where_it_sells`, `estimated`, `notes`), `difference_from_baseline`, `best_for_seller`, `assumptions`, `inputs_used`, `fee_schedules`, `fee_schedule_version`, `warnings`, `calculated_at`, `disclaimer`, `related_url`. A concise, neutral human summary is returned as text content.
+### Seller economics (deterministic, no I/O)
+
+| Tool | What it returns |
+|---|---|
+| `compare_selling_costs` | Estimated fees and net proceeds for one sale across selling methods, with a per-method fee breakdown, the difference vs the eBay baseline, and the assumptions used. Requires `sale_price`. |
+| `calculate_required_sale_price` | The per-item price needed to reach a target take-home (or net profit, when `acquisition_cost` is given) on a single method. Requires `target_net`. |
+| `explain_selling_method` | Plain, structured explanation of how each method owns the listing, fulfills, and charges fees. Derived from the same engine, so it never drifts from `compare_selling_costs`. |
+
+**Shared inputs** (`compare_selling_costs`, `calculate_required_sale_price`):
+
+| Field | Type | Default | Notes |
+|---|---|---|---|
+| `currency` | enum `USD` | `USD` | Only USD supported |
+| `quantity` | integer | `1` | Per-order fixed fees applied once |
+| `shipping_amount` | number | `0` | Affects eBay's fee base |
+| `item_category` | enum `trading_cards` | `trading_cards` | Only trading cards |
+| `seller_plan` | `free`\|`starter`\|`pro`\|`shop` | `free` | Marketplace payout tier |
+| `seller_level` | enum | derived from plan | Explicit payout level override |
+| `seller_covers_fees` | boolean | `false` | If false, the buyer pays the platform fee |
+| `ebay_store_subscription` | boolean | `false` | eBay Store rate (12.35%) vs individual (13.25%) |
+| `acquisition_cost` | number | — | Switches output to net profit |
+| `ebay_fee_percent_override` | number | — | Override the estimated eBay FVF % (flat) |
+
+**Supported methods:** `ebay`, `pulltrader_marketplace`, `pulltrader_fbp`, `pulltrader_storefront`, `pulltrader_pos`, plus estimated competitor marketplaces `tcgplayer`, `manapool`, `misprint`, `fanatics_collect`, `goldin` (off by default — opt in via `methods`). Competitor figures model **fixed-price / Buy Now seller fees only**.
 
 ## Example prompts
 
+- "What is this card: 2023 Bowman Chrome Elly De La Cruz PSA 10?"
+- "Show me recent sold comps and the market value for that card."
+- "What's the price history on a 2018 Prizm Luka Doncic Silver PSA 10 over the last year?"
 - "Compare my estimated proceeds on a $250 graded-card sale."
 - "What would I keep on an $80 card on eBay vs Pulltrader?"
-- "If I'm on the Pro plan, what do I net on a $500 sale through Pulltrader?"
+- "What do I have to sell it for to clear $200 after fees?"
 - "Explain the assumptions behind this payout estimate."
 
 ## Example response (text summary)
@@ -86,7 +107,7 @@ Add to your MCP client config:
 ```json
 {
   "mcpServers": {
-    "pulltrader-seller-economics": {
+    "scout-by-pulltrader": {
       "url": "https://mcp.pulltrader.app/mcp"
     }
   }
@@ -97,17 +118,36 @@ Add to your MCP client config:
 
 ## Public access & rate limits
 
-Public and read-only. A best-effort per-IP rate limit (default 60 req/min) guards the endpoint and returns HTTP 429 with `Retry-After`. There is no authenticated tier in this release.
+Public and read-only. There is no authenticated tier in this release.
+
+| Limit | Default | Notes |
+|---|---|---|
+| All `POST /mcp` | 60 / IP / min | HTTP 429 + `Retry-After`. Fail-open if KV is down. |
+| Data tools (identify / comps / market / history) | 8 / IP / min, 40 / IP / day | Tool `isError` `RATE_LIMITED`. Fail-closed if KV is down. |
+| Data tools global | 10,000 / day | Circuit breaker for model + comps spend. |
+| Batch size | 5 messages | Larger batches are rejected. |
+
+Requires the `MCP_ABUSE` KV namespace (see `wrangler.toml`). Tune via `PUBLIC_RATE_LIMIT_PER_MIN`, `DATA_RATE_LIMIT_PER_MIN`, `DATA_RATE_LIMIT_PER_DAY`, `DATA_GLOBAL_LIMIT_PER_DAY`.
+
+## Errors
+
+Input problems come back as a tool result with `isError: true` and a stable code, not a JSON-RPC error: `INVALID_INPUT`, `NOT_FOUND`, `RATE_LIMITED`, `UPSTREAM_ERROR`, `UPSTREAM_TIMEOUT`, `DATA_BACKEND_UNAVAILABLE`, `INTERNAL_ERROR`. Unknown methods and malformed envelopes use standard JSON-RPC error codes.
+
+The four card tools require the backend bridge (`PULLTRADER_API_BASE` + `SCOUT_MCP_SECRET`). Without it they degrade to `DATA_BACKEND_UNAVAILABLE`; the three seller-economics tools are pure and always available.
 
 ## Data sources & fee freshness
 
+- **Card data** is limited-public and estimate-only: a capped sample of recent sold comps, aggregated by the shared Scout domain engine.
 - **Pulltrader fees** mirror Pulltrader's authoritative internal fee configuration.
 - **eBay fees** are an **estimate** of published trading-card rates (tiered individual/Store final value fee + order-size-based per-order fee), updated and reviewed on a schedule. See [docs/FEE_SCHEDULES.md](docs/FEE_SCHEDULES.md). Responses warn if a schedule is past its review date.
+
+Current schedule versions are served live at [`/version`](https://mcp.pulltrader.app/version).
 
 ## Limitations
 
 - eBay estimates exclude promoted listings, international fees, buyer-paid sales tax, and the seller's own shipping-label cost.
-- Not financial advice; actual proceeds vary.
+- Market values are estimates from recent sales, excluding fees, taxes, and shipping.
+- Not financial advice; actual proceeds and actual value vary.
 - Trading cards / USD only in this release.
 
 ## Development
@@ -119,17 +159,30 @@ npm test            # vitest
 npm run dev         # wrangler dev (local)
 ```
 
-Deploy and registry submission require **explicit approval** — see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md). Do not deploy or publish from a development environment.
+Deploy and registry submission require **explicit approval** — see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md). Do not deploy or publish from a development session.
 
 ## More
 
 - [PRIVACY](docs/PRIVACY.md) · [SECURITY](docs/SECURITY.md) · [TERMS](docs/TERMS.md) · [CHANGELOG](docs/CHANGELOG.md)
 - [Fee schedules & update process](docs/FEE_SCHEDULES.md)
 
+## Deploy prerequisites
+
+```bash
+wrangler kv namespace create MCP_ABUSE
+wrangler kv namespace create MCP_ABUSE --preview
+# Paste ids into wrangler.toml [[kv_namespaces]] binding MCP_ABUSE
+wrangler secret put SCOUT_MCP_SECRET
+```
+
 ## Roadmap
 
-Card market context (comparable sales / pricing) is intentionally **deferred**. It will only be added if this MVP demonstrates useful repeat usage, acceptable cost, reliable outputs, meaningful seller intent, measurable conversion, and low support burden — and after data-licensing and abuse/auth review.
+- Image-based card identification.
+- Athlete/player profile tools.
+- Authenticated per-user quotas (OAuth), deferred until measurement shows a need.
 
 ---
 
 Built and maintained by Pulltrader. Support: support@pulltrader.app
+
+<sub>This repository is the public mirror of the Scout MCP Worker, exported from the Pulltrader monorepo on each release. Issues and questions are welcome here; pull requests are applied upstream. `wrangler.toml` KV ids are redacted — deploys run from the monorepo.</sub>
