@@ -1,8 +1,22 @@
 # Changelog
 
+## 0.6.1
+
+- Use Pulltrader for the server title and research instructions. Keep existing endpoints and tool names.
+
 All notable changes to the Pulltrader Seller Economics MCP server are documented here.
 Versioning follows [Semantic Versioning](https://semver.org/). The MCP server version,
 `server.json` version, and `package.json` version must stay in sync for registry publishing.
+
+## [Unreleased]
+### Fixed
+- **Public mirror was three releases behind.** `github.com/pulltrader/pulltrader-mcp` — the repo every directory crawls (official MCP Registry, Smithery, Glama, PulseMCP) — was frozen at 0.2.2 and advertised a single tool, while production served seven at 0.5.0. The 0.3.0 move of the fee engine into `@pulltrader/scout-domain` made the worker un-copyable standalone, and the mirror silently stopped being updated. `scripts/sync-mcp-public.sh` now exports the worker with the shared package vendored and the path alias rewritten, so the mirror builds and tests on its own; see [DISTRIBUTION](DISTRIBUTION.md) §0.
+- `README.md` rewritten for the current server: it still described a one-tool seller-economics service and listed card identification, comps, and market value as out of scope.
+- Parity test in `@pulltrader/scout-domain` declared a local `SELLER_LEVEL_RATES` oracle that shadowed the imported schedule constant, so the schedule-vs-engine assertions compared the oracle against itself. The legacy copy is now `LEGACY_SELLER_LEVEL_RATES`.
+
+### Added
+- `test/publishedMetadata.test.ts`: fails the build when `server.json` advertises a different tool set than `src/tools/registry.ts`, or when `server.json` / `package.json` / `src/version.ts` versions diverge.
+- `glama.json` for Glama listing ownership.
 
 ## [0.5.0]
 ### Added
@@ -75,3 +89,10 @@ Versioning follows [Semantic Versioning](https://semver.org/). The MCP server ve
 - **Minor:** new optional inputs/outputs or new tools (backwards compatible).
 - **Major:** breaking changes to tool names, required inputs, or output shape.
 - Breaking changes are announced here at least one minor release ahead where practical. Removed tools return a clear `UNSUPPORTED_*` error for one minor cycle before deletion.
+
+## 0.6.0 — 2026-09-22
+
+Added a separate read-only seller MCP at `/seller/mcp`, protected by a dedicated
+Auth0 audience, `seller:read` scope and current Business subscription. Tools read
+confirmed Business Context, search the signed-in seller's inventory, and compare
+exact Mana Pool variants. Public `/mcp` still exposes only its seven public tools.

@@ -32,6 +32,7 @@ import {
   explainSellingMethod,
   summarizeExplain,
 } from "./explainSellingMethod";
+import * as checkKaptureCert from "./checkKaptureCert";
 import * as identifyCard from "./identifyCard";
 import * as searchCardSales from "./searchCardSales";
 import * as summarizeCardMarket from "./summarizeCardMarket";
@@ -66,6 +67,7 @@ export interface McpTool {
 }
 
 export const TOOLS: McpTool[] = [
+  { name: checkKaptureCert.TOOL_NAME, definition: checkKaptureCert.TOOL_DEFINITION, costTier: "data", run: checkKaptureCert.run },
   // --- Pure seller-economics tools ---
   {
     name: COMPARE_NAME,

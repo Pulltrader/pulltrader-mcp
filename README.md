@@ -1,8 +1,8 @@
-# Scout by Pulltrader — Trading-Card MCP Server
+# Pulltrader — Trading-Card MCP Server
 
 > Identify a card, pull recent sold comps, summarize its market value, chart its price history, and compare what a seller keeps across eBay, Pulltrader, and other card marketplaces — inside your AI assistant.
 
-A public, read-only [Model Context Protocol](https://modelcontextprotocol.io) server for **trading-card research and selling**. Seven tools: four back onto Scout's card data (identification, comparable sold sales, market value, price history), three run Pulltrader's deterministic seller-economics engine over a dated, versioned fee schedule.
+A public, read-only [Model Context Protocol](https://modelcontextprotocol.io) server for **trading-card research and selling**. Eight tools: a Kapture stolen-card registry check, four back onto Pulltrader's card data (identification, comparable sold sales, market value, price history), three run Pulltrader's deterministic seller-economics engine over a dated, versioned fee schedule.
 
 Market figures are **estimates** derived from recent sales. Fee math is **deterministic** — the server computes it and never asks the model to infer fees from prose. eBay figures are clearly labeled estimates.
 
@@ -29,6 +29,15 @@ Trading-card sellers, dealers, shops, and collectors who want to know what a car
 | State its assumptions, data freshness, and limitations | Cover non-card categories or currencies other than USD |
 
 ## Tools
+
+### Kapture cert check (data-backed)
+
+`check_kapture_cert` accepts `{ "cert": "00123456" }` and preserves leading zeros.
+CLEAN only means no verified stolen report matched. STOLEN includes the Kapture
+report and a voluntary Pulltrader recovery-form link. The tool never collects
+personal information, infers possession, or submits a recovery report. The backend
+holds `KAPTURE_API_KEY`; no new Worker secret is needed. Recovery handoff is manual
+until Kapture provides a reporting API. See `pulltrader-backend/docs/KAPTURE.md`.
 
 ### Card research (data-backed)
 
@@ -118,7 +127,7 @@ Add to your MCP client config:
 
 ## Public access & rate limits
 
-Public and read-only. There is no authenticated tier in this release.
+The `/mcp` endpoint is public and read-only. A separate seller resource is implemented at `/seller/mcp`; OAuth is provisioned and its signed-in pilot is pending. See [Seller MCP](docs/SELLER_MCP.md).
 
 | Limit | Default | Notes |
 |---|---|---|
@@ -137,7 +146,7 @@ The four card tools require the backend bridge (`PULLTRADER_API_BASE` + `SCOUT_M
 
 ## Data sources & fee freshness
 
-- **Card data** is limited-public and estimate-only: a capped sample of recent sold comps, aggregated by the shared Scout domain engine.
+- **Card data** is limited-public and estimate-only: a capped sample of recent sold comps, aggregated by the shared Pulltrader domain engine.
 - **Pulltrader fees** mirror Pulltrader's authoritative internal fee configuration.
 - **eBay fees** are an **estimate** of published trading-card rates (tiered individual/Store final value fee + order-size-based per-order fee), updated and reviewed on a schedule. See [docs/FEE_SCHEDULES.md](docs/FEE_SCHEDULES.md). Responses warn if a schedule is past its review date.
 
@@ -179,10 +188,10 @@ wrangler secret put SCOUT_MCP_SECRET
 
 - Image-based card identification.
 - Athlete/player profile tools.
-- Authenticated per-user quotas (OAuth), deferred until measurement shows a need.
+- Complete the signed-in seller pilot for `/seller/mcp`; global per-user quotas remain future work.
 
 ---
 
 Built and maintained by Pulltrader. Support: support@pulltrader.app
 
-<sub>This repository is the public mirror of the Scout MCP Worker, exported from the Pulltrader monorepo on each release. Issues and questions are welcome here; pull requests are applied upstream. `wrangler.toml` KV ids are redacted — deploys run from the monorepo.</sub>
+<sub>This repository is the public mirror of the Pulltrader MCP Worker, exported from the Pulltrader monorepo on each release. Issues and questions are welcome here; pull requests are applied upstream. `wrangler.toml` KV ids are redacted — deploys run from the monorepo.</sub>

@@ -77,9 +77,9 @@ export async function handleMcpMessage(msg: unknown, ctx: McpContext = {}): Prom
         response: ok(id, {
           protocolVersion,
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: SERVER_NAME, title: "Scout by Pulltrader", version: SERVER_VERSION },
+          serverInfo: { name: SERVER_NAME, title: "Pulltrader", version: SERVER_VERSION },
           instructions:
-            "Scout's trading-card intelligence tools. Card research: identify_card resolves a text description into structured fields; search_card_sales returns recent comparable sold sales; summarize_card_market gives median/percentile/volatility market value; get_card_price_history returns a price-over-time series. Seller economics: compare_selling_costs estimates what a seller keeps across eBay and Pulltrader methods; calculate_required_sale_price solves for the price to hit a target net; explain_selling_method describes how each method charges fees. All market figures are estimates from recent sales (excluding fees/taxes/shipping) and are not financial advice; never claim guaranteed value or one platform as universally cheapest. Trading cards only.",
+            "Pulltrader's trading-card intelligence tools. check_kapture_cert checks exact cert numbers for verified stolen reports and returns a voluntary recovery link on a match; CLEAN never establishes authenticity or ownership. Card research: identify_card resolves a text description into structured fields; search_card_sales returns recent comparable sold sales; summarize_card_market gives median/percentile/volatility market value; get_card_price_history returns a price-over-time series. Seller economics: compare_selling_costs estimates what a seller keeps across eBay and Pulltrader methods; calculate_required_sale_price solves for the price to hit a target net; explain_selling_method describes how each method charges fees. All market figures are estimates from recent sales (excluding fees/taxes/shipping) and are not financial advice; never claim guaranteed value or one platform as universally cheapest. Trading cards only.",
         }),
       };
     }

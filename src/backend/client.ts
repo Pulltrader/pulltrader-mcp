@@ -76,7 +76,7 @@ export interface CardMarketPayload {
   is_graded: boolean;
   /**
    * Headline value from the authoritative provider, chosen by grade:
-   * raw cards -> JustTCG/CardSightAI; graded cards -> eBay sold comps.
+   * raw cards -> Scrydex/CardSightAI; graded cards -> eBay sold comps.
    */
   market_value: number | null;
   /** Provider that produced market_value: "TCG Market" | "CardSightAI" | "eBay Comps". */
@@ -131,7 +131,7 @@ async function request<T>(
   body?: unknown,
 ): Promise<BackendResult<T>> {
   if (!isConfigured(cfg)) {
-    return { ok: false, code: "NOT_CONFIGURED", message: "The Scout data backend is not configured for this server." };
+    return { ok: false, code: "NOT_CONFIGURED", message: "The Pulltrader data backend is not configured for this server." };
   }
 
   const doFetch = cfg.fetchImpl ?? fetch;
@@ -192,4 +192,12 @@ export function cardMarketRequest(
 
 export function athleteRequest(cfg: BackendConfig | undefined, slug: string): Promise<BackendResult<AthletePayload>> {
   return request<AthletePayload>(cfg, "GET", `/api/mcp/athlete/${encodeURIComponent(slug)}`);
+}
+
+
+export interface KapturePayload {
+  kapture: { cert: string; status: 'CLEAN' | 'STOLEN' | 'UNAVAILABLE'; checkedAt: string | null; expiresAt: string | null; reportUrl?: string | null };
+}
+export function kaptureCertRequest(cfg: BackendConfig | undefined, cert: string): Promise<BackendResult<KapturePayload>> {
+  return request<KapturePayload>(cfg, 'POST', '/api/mcp/kapture-cert', { cert });
 }

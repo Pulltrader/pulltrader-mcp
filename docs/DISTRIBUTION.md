@@ -86,7 +86,7 @@ PulseMCP, MCP.so, and similar largely **crawl the official registry and the publ
 
 ## Listing copy
 
-**Title:** Scout by Pulltrader
+**Title:** Pulltrader
 
 **Short description (≤ \~120 chars):**
 

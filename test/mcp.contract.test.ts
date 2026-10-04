@@ -46,6 +46,7 @@ describe("MCP: notifications", () => {
 describe("MCP: cost tiers", () => {
   it("marks card tools as data-tier for abuse budgets", () => {
     expect([...DATA_TOOL_NAMES].sort()).toEqual([
+      "check_kapture_cert",
       "get_card_price_history",
       "identify_card",
       "search_card_sales",
@@ -57,11 +58,12 @@ describe("MCP: cost tiers", () => {
 });
 
 describe("MCP: tools/list", () => {
-  it("advertises the full Scout tool set", async () => {
+  it("advertises the full Pulltrader tool set", async () => {
     const { response } = await call("tools/list");
     const tools = (response!.result as any).tools;
     const names = tools.map((t: any) => t.name);
     expect(names).toEqual([
+      "check_kapture_cert",
       "compare_selling_costs",
       "calculate_required_sale_price",
       "explain_selling_method",

@@ -1,9 +1,9 @@
 {
   "name": "pulltrader-mcp",
-  "version": "0.5.0",
+  "version": "0.6.1",
   "private": true,
   "type": "module",
-  "description": "Scout by Pulltrader — trading-card intelligence MCP server. Identify cards, look up recent comparable sales, summarize market value, chart price history, and compare seller economics across eBay, Pulltrader, and other marketplaces.",
+  "description": "Pulltrader — trading-card intelligence MCP server. Identify cards, look up recent comparable sales, summarize market value, chart price history, and compare seller economics across eBay, Pulltrader, and other marketplaces.",
   "license": "MIT",
   "homepage": "https://pulltrader.app/mcp",
   "repository": {

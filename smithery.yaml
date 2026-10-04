@@ -1,4 +1,4 @@
-# Smithery listing metadata for Scout by Pulltrader (trading-card intelligence +
+# Smithery listing metadata for Pulltrader (trading-card intelligence +
 # seller economics).
 #
 # This server is REMOTE and already hosted (bring-your-own-hosting). Smithery's
@@ -20,7 +20,7 @@ transport: streamable-http
 authentication: none
 
 metadata:
-  name: Scout by Pulltrader
+  name: Pulltrader
   description: Identify trading cards, look up recent comparable sold sales, summarize market value, chart price history, and compare what a seller keeps across eBay, Pulltrader, and other card marketplaces.
   categories:
     - finance

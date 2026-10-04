@@ -7,16 +7,16 @@ import type { BackendErrorCode } from "../backend/client";
 export function mapBackendError(code: BackendErrorCode, message: string): ToolError {
   switch (code) {
     case "NOT_CONFIGURED":
-      return toolError("DATA_BACKEND_UNAVAILABLE", "This Scout server is not configured to return live card or athlete data.");
+      return toolError("DATA_BACKEND_UNAVAILABLE", "This Pulltrader server is not configured to return live card or athlete data.");
     case "TIMEOUT":
-      return toolError("UPSTREAM_TIMEOUT", "The Scout data service took too long to respond. Please try again.");
+      return toolError("UPSTREAM_TIMEOUT", "The Pulltrader data service took too long to respond. Please try again.");
     case "RATE_LIMITED":
-      return toolError("RATE_LIMITED", "The Scout data service is rate limiting requests. Please retry shortly.");
+      return toolError("RATE_LIMITED", "The Pulltrader data service is rate limiting requests. Please retry shortly.");
     case "NOT_FOUND":
       return toolError("NOT_FOUND", message || "No matching record was found.");
     case "UPSTREAM_ERROR":
     default:
-      return toolError("UPSTREAM_ERROR", "The Scout data service is temporarily unavailable.");
+      return toolError("UPSTREAM_ERROR", "The Pulltrader data service is temporarily unavailable.");
   }
 }
 

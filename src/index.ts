@@ -6,6 +6,7 @@
 // transport + operational layer (routing, CORS, abuse budgets, health, analytics).
 // =============================================================================
 
+import { sellerRequest, sellerMetadata, SELLER_METADATA_PATH } from "./seller";
 import { handleMcpMessage, type JsonRpcResponse } from "./mcp";
 import { checkCoarseLimit, checkDataToolBudget, type AbuseKv } from "./abuseGuard";
 import { anonymousId, capture, type AnalyticsEnv } from "./analytics";
@@ -88,6 +89,9 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";
+
+    if (path === SELLER_METADATA_PATH && request.method === "GET") return sellerMetadata();
+    if (path === "/seller/mcp") return sellerRequest(request, env);
 
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
